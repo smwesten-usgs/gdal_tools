@@ -1,5 +1,6 @@
 import os
 from osgeo import gdal
+from osgeo import ogr
 import rasterio as rio
 import json
 
@@ -19,13 +20,24 @@ def gdal_error_handler(err_class, err_num, err_msg):
     print('Error Message: %s' % (err_msg))
 
 # install error handler
+gdal.UseExceptions()
 gdal.PushErrorHandler(gdal_error_handler)
 
-def get_extents(filename):
+
+def get_shapefile_extent(filename):
+    driver = ogr.GetDriverByName('ESRI Shapefile')
+    shp = driver.Open(filename)
+    layer = shp.GetLayer()
+    corner_coordinates = layer.GetExtent()
+    return corner_coordinates
+
+
+def get_raster_extent(filename):
     myopts = gdal.InfoOptions(options = ['-json'], reportProj4=True)
     myinfo = gdal.Info(filename,options=myopts)
     corner_coordinates = myinfo.get('cornerCoordinates')
     return corner_coordinates
+
 
 def get_proj4(filename):
     myopts = gdal.InfoOptions(options = ['-json'], reportProj4=True)
@@ -33,11 +45,13 @@ def get_proj4(filename):
     proj4 = myinfo.get('coordinateSystem').get('proj4')
     return proj4
 
+
 def get_wkt(filename):
     myopts = gdal.InfoOptions(options = ['-json'])
     myinfo = gdal.Info(filename,options=myopts)
     wkt = myinfo.get('coordinateSystem').get('wkt')
     return wkt
+
 
 def get_nx_ny(filename):
     myopts = gdal.InfoOptions(options = ['-json'], reportProj4=True)
@@ -45,6 +59,7 @@ def get_nx_ny(filename):
     (nx, ny) = myjson['size']
     (nx,ny) = myinfo.get('coordinateSystem').get('size')
     return (nx, ny)
+
 
 def gdalwarp(src_file, dst_file, src_proj4, dst_proj4, nx, ny, xll, yll, xur, yur, output_type, resample_algorithm):
 
@@ -62,6 +77,7 @@ def gdalwarp(src_file, dst_file, src_proj4, dst_proj4, nx, ny, xll, yll, xur, yu
                     srcDSOrSrcDSTab=src_file,
                     options=warp_options)
     res = None
+    
 
 def gdal_translate( dst_file, src_file='temp.img', output_type=gdal.GDT_Float32, gdal_format='AAIGrid',nodata=-9999.):
     if output_type == gdal.GDT_Float32:
@@ -77,9 +93,13 @@ def gdal_translate( dst_file, src_file='temp.img', output_type=gdal.GDT_Float32,
     res=gdal.Translate(dst_file,src_file,options=translate_options)
     res=None
 
-def gdal_rasterize( dst_file, src_file, dst_proj4, resolution, xll, yll, xur, yur,
+
+def gdal_rasterize( dst_file, src_file, dst_proj4, resolution, xll=None, yll=None, xur=None, yur=None,
                     layer='', attribute='', gdal_format='HFA',
                     output_type=gdal.GDT_Float32, nodata=-9999):
+
+    if xll is None or yll is None:
+        xll, yll, xur, yur = get_shapefile_extent(src_file)
 
     rasterize_options = gdal.RasterizeOptions(
                               outputSRS=dst_proj4,
