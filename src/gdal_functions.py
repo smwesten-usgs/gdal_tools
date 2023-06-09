@@ -1,6 +1,7 @@
 import os
 from osgeo import gdal
 from osgeo import ogr
+from osgeo_utils.gdal_fillnodata import *
 import rasterio as rio
 import json
 
@@ -61,7 +62,7 @@ def get_nx_ny(filename):
     return (nx, ny)
 
 
-def gdalwarp(src_file, dst_file, src_proj4, dst_proj4, nx, ny, xll, yll, xur, yur, output_type, resample_algorithm):
+def raster_warp(src_file, dst_file, src_proj4, dst_proj4, nx, ny, xll, yll, xur, yur, output_type, resample_algorithm):
 
     warp_options = gdal.WarpOptions(dstSRS=dst_proj4, 
                                     srcSRS=src_proj4,
@@ -79,7 +80,7 @@ def gdalwarp(src_file, dst_file, src_proj4, dst_proj4, nx, ny, xll, yll, xur, yu
     res = None
     
 
-def gdal_translate( dst_file, src_file='temp.img', output_type=gdal.GDT_Float32, gdal_format='AAIGrid',nodata=-9999.):
+def raster_translate( dst_file, src_file='temp.img', output_type=gdal.GDT_Float32, gdal_format='AAIGrid',nodata=-9999.):
     if output_type == gdal.GDT_Float32:
       translate_options = gdal.TranslateOptions(format=gdal_format, 
                                                 outputType=output_type,
@@ -94,12 +95,12 @@ def gdal_translate( dst_file, src_file='temp.img', output_type=gdal.GDT_Float32,
     res=None
 
 
-def gdal_rasterize( dst_file, src_file, dst_proj4, resolution, xll=None, yll=None, xur=None, yur=None,
+def shape_rasterize( dst_file, shp_file, dst_proj4, resolution, xll=None, yll=None, xur=None, yur=None,
                     layer='', attribute='', gdal_format='HFA',
                     output_type=gdal.GDT_Float32, nodata=-9999):
 
     if xll is None or yll is None:
-        xll, yll, xur, yur = get_shapefile_extent(src_file)
+        xll, yll, xur, yur = get_shapefile_extent(shp_file)
 
     rasterize_options = gdal.RasterizeOptions(
                               outputSRS=dst_proj4,
@@ -111,6 +112,27 @@ def gdal_rasterize( dst_file, src_file, dst_proj4, resolution, xll=None, yll=Non
                               yRes=resolution,
                               attribute=attribute)
     res=gdal.Rasterize( dst_file,
-                        src_file,
+                        shp_file,
                         options=rasterize_options)
     res=None
+
+def raster_fillnodata(src_filename,
+                      band_number=1,
+                      dst_filename=None,
+                      driver_name='GTiff',
+                      creation_options=None,
+                      max_distance=100,
+                      smoothing_iterations=0):
+    
+    creation_options = creation_options or []
+    
+    if dst_filename is not None:
+        gdal_fillnodata(src_filename=src_filename,
+                        band_number=band_number,
+                        dst_filename=dst_filename,
+                        driver_name=driver_name,
+                        creation_options=creation_options,
+                        max_distance=max_distance,
+                        smoothing_iterations=smoothing_iterations,)
+        
+        
